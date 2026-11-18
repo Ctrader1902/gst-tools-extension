@@ -86,3 +86,9 @@ test("tables", () => {
                              ret: "GSTR-2B", tag: "GSTR2B_EXCEL", fmt: "excel" });
   eq(M.TASKS.gstr1_pdf_ack.tag, "GSTR1_ACK");
 });
+
+test("isPortalDownload: files made inside a portal page (blob:, data:)", () => {
+  eq(M.isPortalDownload({ url: "blob:https://gstr2b.gst.gov.in/5f1c-77", referrer: "" }), true, "blob from GSTR-2B");
+  eq(M.isPortalDownload({ url: "data:application/vnd.ms-excel;base64,AAAA", referrer: "" }), true, "data URL");
+  eq(M.isPortalDownload({ url: "blob:https://example.com/1", referrer: "" }), false, "blob from another site");
+});
