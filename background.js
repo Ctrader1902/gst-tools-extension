@@ -178,7 +178,9 @@ async function handle(msg) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg || !msg.cmd || sender.tab) return false;    // only the side panel
+  // Commands come from our own pages (side panel).  Web pages cannot message
+  // the extension, and our content script never sends `cmd`.
+  if (!msg || !msg.cmd || sender.id !== chrome.runtime.id) return false;
   handle(msg).then(sendResponse, (e) => sendResponse({ error: String(e.message || e) }));
   return true;
 });

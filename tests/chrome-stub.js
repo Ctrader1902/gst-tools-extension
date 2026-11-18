@@ -5,6 +5,8 @@
 (function () {
   const calls = [];
   const answers = {};
+  const events = {};
+  const constants = { "chrome.runtime.id": "test-ext-id" };
   function node(path) {
     const fn = (...args) => {
       calls.push({ path, args });
@@ -14,14 +16,20 @@
     return new Proxy(fn, {
       get(_t, k) {
         if (k === "then") return undefined;
+        const sub = `${path}.${String(k)}`;
+        if (sub in constants) return constants[sub];
         if (typeof k === "string" && /^on[A-Z]/.test(k)) {
-          const fns = [];
-          return { fns, addListener: (f) => fns.push(f), removeListener() {} };
+          if (!events[sub]) {
+            const fns = [];
+            events[sub] = { fns, addListener: (f) => fns.push(f), removeListener() {} };
+          }
+          return events[sub];
         }
-        return node(`${path}.${String(k)}`);
+        return node(sub);
       },
     });
   }
+  globalThis.chromeEvents = events;
   globalThis.chromeCalls = calls;
   globalThis.chromeAnswers = answers;
   globalThis.chrome = node("chrome");

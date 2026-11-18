@@ -25,6 +25,25 @@ test("status reports not logged in", async () => {
   eq(r.loggedIn, false);
   eq(r.running, false);
 });
+function sendFrom(sender, msg) {
+  return new Promise((resolve) => {
+    const fns = chromeEvents["chrome.runtime.onMessage"].fns;
+    let answered = false;
+    for (const f of fns) {
+      const keep = f(msg, sender, (r) => { answered = true; resolve(r); });
+      if (keep === true) return;
+    }
+    if (!answered) resolve("no answer");
+  });
+}
+test("answers extension pages, also when open in a tab", async () => {
+  const r = await sendFrom({ id: "test-ext-id", tab: { id: 7 },
+                             url: "chrome-extension://test-ext-id/sidepanel/index.html" }, { cmd: "status" });
+  eq(r.loggedIn, false);
+});
+test("ignores other extensions", async () => {
+  eq(await sendFrom({ id: "someone-else" }, { cmd: "status" }), "no answer");
+});
 test("summary wording", () => {
   const s = summarize("gstr2b_json", { April: { state: "saved" }, June: { state: "pending" } });
   eq(s, { kind: "warn", text: "GSTR-2B JSON: 1 downloaded, 1 not ready yet." });
