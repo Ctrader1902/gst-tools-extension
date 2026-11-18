@@ -18,6 +18,17 @@
     return el.dataset.gstId;
   }
   const byId = (id) => document.querySelector(`[data-gst-id="${CSS.escape(String(id))}"]`);
+
+  /** Click like the page itself would.  A click from this (extension) world
+   *  on an <a href="javascript:..."> is blocked by the extension's Content
+   *  Security Policy, so hand it to the page helper (tabs.js) when present. */
+  function pageClick(el) {
+    if (document.documentElement.dataset.gstMain === "1") {
+      document.dispatchEvent(new CustomEvent("gst-click", { detail: idOf(el) }));
+    } else {
+      el.click();
+    }
+  }
   const ref = (el) => ({ id: idOf(el), text: textOf(el) });
 
   /** Visible <select>s with a lowercase description (label/name/id/ng-model). */
@@ -104,7 +115,7 @@
       const el = byId(id);
       if (!el) return false;
       try { el.scrollIntoView({ block: "center" }); } catch (e) { /* ignore */ }
-      el.click();
+      pageClick(el);
       return true;
     },
 
@@ -196,7 +207,7 @@
       for (const el of document.querySelectorAll(".modal a, .modal button, .ui-dialog button")) {
         const t = textOf(el);
         if (vis(el) && /^(proceed|yes|ok|download.*)$/i.test(t)) {
-          el.click();
+          pageClick(el);
           return t;
         }
       }
@@ -209,7 +220,7 @@
       for (const el of document.querySelectorAll(".modal button, .modal a")) {
         if (!vis(el)) continue;
         const t = textOf(el).toLowerCase();
-        if (["close", "×", "x"].includes(t) || el.classList.contains("close")) { el.click(); n++; }
+        if (["close", "×", "x"].includes(t) || el.classList.contains("close")) { pageClick(el); n++; }
       }
       return n;
     },
@@ -221,7 +232,7 @@
         try { return new URL(x.href, location.href).pathname === path; } catch (e) { return false; }
       });
       setTimeout(() => {
-        if (a) { a.setAttribute("target", "_self"); a.click(); } else { location.href = url; }
+        if (a) { a.setAttribute("target", "_self"); pageClick(a); } else { location.href = url; }
       }, 50);
       return a ? "menu link" : "page script";
     },

@@ -77,6 +77,13 @@
           if (String(type).toLowerCase() === "beforeunload") return undefined;
           return add.call(this, type, ...rest);
         };
+        // clicks for the extension happen here, in the page's own world, so
+        // <a href="javascript:..."> links run under the portal's own rules
+        document.addEventListener("gst-click", (ev) => {
+          const el = document.querySelector(`[data-gst-id="${CSS.escape(String(ev.detail))}"]`);
+          if (el) el.click();
+        });
+        document.documentElement.dataset.gstMain = "1";
       },
     }), "inject");
   }

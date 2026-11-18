@@ -40,6 +40,15 @@ test("injected page helper blocks 'Leave site?' checks", async () => {
   window.dispatchEvent(new Event("beforeunload"));
   eq(called, 0, "listener ignored");
   eq(window.onbeforeunload, null, "handler ignored");
+  // the same helper clicks for the extension, inside the page
+  eq(document.documentElement.dataset.gstMain, "1", "helper announces itself");
+  const a = document.createElement("a");
+  a.dataset.gstId = "z1";
+  let hits = 0;
+  a.addEventListener("click", (e) => { e.preventDefault(); hits++; });
+  document.body.appendChild(a);
+  document.dispatchEvent(new CustomEvent("gst-click", { detail: "z1" }));
+  eq(hits, 1, "page helper clicked the element");
 });
 test("run tab is a duplicate of the user's logged-in tab (keeps the portal session)", async () => {
   chromeAnswers["chrome.tabs.duplicate"] = (id) => ({ id: 77, windowId: 1, index: 2, openerTabId: id });

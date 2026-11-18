@@ -142,3 +142,19 @@ test("docId is stable within one document", () => {
   ok(typeof a === "string" && a.length > 4);
   eq(P.docId(), a);
 });
+
+test("click goes through the page's own helper when it is there (javascript: links)", () => {
+  stage("gstr2b");
+  const seen = [];
+  const onGstClick = (ev) => seen.push(ev.detail);
+  document.addEventListener("gst-click", onGstClick);
+  document.documentElement.dataset.gstMain = "1";
+  let direct = 0;
+  document.getElementById("gen-json").addEventListener("click", () => direct++);
+  const b = P.controls(MT.JSON_RX)[0];
+  eq(P.click(b.id), true);
+  eq(seen, [b.id], "handed to the page helper");
+  eq(direct, 0, "not clicked from the extension's world");
+  delete document.documentElement.dataset.gstMain;
+  document.removeEventListener("gst-click", onGstClick);
+});
