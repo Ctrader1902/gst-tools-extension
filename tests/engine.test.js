@@ -208,3 +208,20 @@ test("multi-part download keeps working in a tab the tile opened", async () => {
   eq(w.clicks, ["tile", "json", "l0", "l1"]);
   eq(r.files.length, 2);
 });
+
+test("VIEW row does not wait for a direct download", async () => {
+  const w = fakeWorld({
+    tile: () => ({ id: "tile", text: "VIEW" }),
+    controls: {
+      "view summary": () => [{ id: "sum", text: "VIEW SUMMARY" }],
+      [MM.PDF_RX]: (w) => (w.clicks.includes("sum") ? [{ id: "pdf", text: "DOWNLOAD (PDF)" }] : []),
+    },
+    fileOn: ["pdf"],
+  });
+  const waits = [];
+  const orig = w.ctx.downloads.waitNew;
+  w.ctx.downloads.waitNew = async (since, ms) => { waits.push(ms); return orig(since, ms); };
+  const r = await E.runMonth(w.ctx, MM.TASKS.gstr1_pdf_ack, "2025-26", "April", "download");
+  eq(r.state, "saved");
+  eq(waits, [120000], "only the PDF wait");
+});

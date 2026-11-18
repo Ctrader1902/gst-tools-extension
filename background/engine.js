@@ -321,8 +321,10 @@
     await ctx.sleep(2000);
     await acceptDialogs(ctx);
 
-    let files = await waitFiles(ctx, since, 12000);
+    // DOWNLOAD may hand the PDF over at once; VIEW only opens the return
+    let files = /^view$/i.test(btn.text || "") ? [] : await waitFiles(ctx, since, 12000);
     if (files.length) return files;
+    ctx.downloads.settle();
     await ctx.followNewTab();
 
     // GSTR-1: VIEW opens the return; the PDF is on its summary page

@@ -18,6 +18,7 @@ const MAX_LOG = 300;
 const MAX_DEBUG = 10;
 
 GSTDownloads.install(chrome.downloads);
+GSTDownloads.onArrived((path) => log(`File arrived: ${String(path).split(/[\\/]/).pop()}`, "ok"));
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
 let running = null;        // promise of the active run

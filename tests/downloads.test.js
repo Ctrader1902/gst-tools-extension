@@ -98,3 +98,34 @@ test("a download stuck in progress does not keep the run waiting forever", async
   ok(Date.now() - t0 < 2000, "gave up after the hard cap");
   D.disarm();
 });
+
+test("finished download is noticed even when Chrome's update event is missed", async () => {
+  const api = fakeApi();
+  api.search = async ({ id }) => [{ id, state: "complete", filename: "C:\d\GST Downloads\T_2025-26_Oct_a.json", bytesReceived: 10 }];
+  D.install(api);
+  const since = Date.now();
+  D.arm({ tag: "T", fy: "2025-26", month: "Oct" }); D.expect();
+  create(api, { id: 21, filename: "a.json", state: "in_progress", ...PORTAL });
+  const t0 = Date.now();
+  const got = await D.waitNew(since, 30000, 10);
+  eq(got, [{ id: 21, filename: "C:\d\GST Downloads\T_2025-26_Oct_a.json" }]);
+  ok(Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+  D.disarm();
+});
+
+test("a stalled extra download does not hold up the file that arrived", async () => {
+  const api = fakeApi();
+  api.search = async ({ id }) => [id === 31
+    ? { id, state: "complete", filename: "C:\d\b.pdf", bytesReceived: 5 }
+    : { id, state: "in_progress", filename: "", bytesReceived: 0 }];
+  D.install(api);
+  const since = Date.now();
+  D.arm({ tag: "T", fy: "2025-26", month: "Nov" }); D.expect();
+  create(api, { id: 31, filename: "b.pdf", state: "in_progress", ...PORTAL });
+  create(api, { id: 32, filename: "b2.pdf", state: "in_progress", ...PORTAL });
+  const t0 = Date.now();
+  const got = await D.waitNew(since, 30000, 10, () => {}, 300000, 300);
+  eq(got.map((g) => g.id), [31]);
+  ok(Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+  D.disarm();
+});
