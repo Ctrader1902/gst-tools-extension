@@ -25,7 +25,7 @@ CHROME_PATHS = [
 ]
 
 PERMISSIONS = ["sidePanel", "downloads", "storage", "scripting"]
-HOSTS = ["https://services.gst.gov.in/*", "https://return.gst.gov.in/*"]
+HOSTS = ["https://*.gst.gov.in/*"]
 
 
 def chrome() -> str:

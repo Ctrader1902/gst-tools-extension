@@ -28,7 +28,7 @@ log in to the portal yourself.
 
 | Permission | Why |
 |---|---|
-| Access to services.gst.gov.in and return.gst.gov.in | To click through the portal pages in the tab the extension opens for a run |
+| Access to GST portal sites (*.gst.gov.in) | To click through the portal pages (returns, GSTR-2B) in the tab the extension opens for a run |
 | downloads | To save and name the downloaded return files |
 | storage | To remember your choices and the activity log |
 | scripting | To run the page helper inside the run's portal tab |

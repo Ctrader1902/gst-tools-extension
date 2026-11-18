@@ -2,7 +2,8 @@
 // load, talk to them, follow tabs the portal opens, and close them again.
 "use strict";
 (function () {
-  const PORTAL_URLS = ["https://services.gst.gov.in/*", "https://return.gst.gov.in/*"];
+  // GSTR-2B and other return pages live on their own *.gst.gov.in sites.
+  const PORTAL_URLS = ["https://*.gst.gov.in/*"];
 
   let runTab = null;        // the tab the run opened
   let current = null;       // the tab page ops go to (runTab or a tab it opened)
@@ -84,6 +85,10 @@
         return res.value;
       } catch (e) {
         if (e.fromPage) throw e;
+        if (/cannot access contents|must request permission/i.test(e.message)) {
+          throw new Error("The portal opened a page outside the GST sites this extension may use. " +
+                          "Please send the Copy debug info text to Asif & Associates.");
+        }
         lastErr = e;
         // a click that navigates can lose its reply: the click still happened
         if ((op === "click" || op === "navigate") && /port closed/i.test(e.message)) return true;

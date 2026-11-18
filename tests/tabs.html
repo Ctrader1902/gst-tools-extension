@@ -15,6 +15,17 @@ test("a page that never answers times out and is retried", async () => {
   eq(await GSTTabs.page.state(), 42);
   eq(n, 2);
 });
+test("a page the extension may not open gives a clear error", async () => {
+  chromeAnswers["chrome.tabs.sendMessage"] = () => Promise.reject(new Error(
+    "Cannot access contents of the page. Extension manifest must request permission to access the respective host."));
+  chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
+  GSTTabs.adopt(3);
+  let err = null;
+  try { await GSTTabs.page.controls("x"); } catch (e) { err = e; }
+  ok(err && err.message.startsWith("The portal opened a page outside the GST sites this extension may use"),
+     err && err.message);
+  chromeAnswers["chrome.tabs.sendMessage"] = () => undefined;
+});
 test("run tab is a duplicate of the user's logged-in tab (keeps the portal session)", async () => {
   chromeAnswers["chrome.tabs.duplicate"] = (id) => ({ id: 77, windowId: 1, index: 2, openerTabId: id });
   chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
