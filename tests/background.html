@@ -89,6 +89,11 @@ test("a run allows multiple downloads on GST sites, then puts the setting back",
      "allowed for GST sites");
   ok(chromeCalls.some((c) => c.path === "chrome.contentSettings.automaticDownloads.clear"), "cleared after the run");
 });
+test("a run allows pop-ups on GST sites (download links open a new tab), then puts it back", () => {
+  ok(chromeCalls.some((c) => c.path === "chrome.contentSettings.popups.set"
+       && c.args[0].primaryPattern === "https://*.gst.gov.in/*" && c.args[0].setting === "allow"), "allowed");
+  ok(chromeCalls.some((c) => c.path === "chrome.contentSettings.popups.clear"), "cleared after the run");
+});
 test("the run finishes even if closing its tab never completes", async () => {
   const authTab = { id: 5, windowId: 1, index: 0, url: "https://services.gst.gov.in/services/auth/dashboard" };
   chromeAnswers["chrome.tabs.query"] = () => [authTab];

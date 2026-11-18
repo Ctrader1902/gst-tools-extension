@@ -8,12 +8,19 @@ const T = globalThis.GSTTabs;
 const LOGIN_URL = "https://services.gst.gov.in/services/login";
 const GST_SITES = "https://*.gst.gov.in/*";
 
-/** GSTR-2B has several files per month.  Chrome blocks a site's second
- *  automatic download unless allowed, so allow it for GST sites during a run. */
-const allowGstDownloads = () =>
-  chrome.contentSettings.automaticDownloads.set({ primaryPattern: GST_SITES, setting: "allow" }).catch(() => {});
-const restoreDownloadSetting = () =>
-  chrome.contentSettings.automaticDownloads.clear({}).catch(() => {});
+/** Clicks made by the extension do not count as the user's clicks, so Chrome
+ *  blocks what it would allow a person: a site's second automatic download
+ *  (GSTR-2B has several files) and links that open a new tab (GSTR-1 JSON
+ *  "Click here to download - File 1").  Allow both for GST sites only, during
+ *  a run, and clear them afterwards. */
+const allowGstDownloads = () => Promise.all([
+  chrome.contentSettings.automaticDownloads.set({ primaryPattern: GST_SITES, setting: "allow" }).catch(() => {}),
+  chrome.contentSettings.popups.set({ primaryPattern: GST_SITES, setting: "allow" }).catch(() => {}),
+]);
+const restoreDownloadSetting = () => Promise.all([
+  chrome.contentSettings.automaticDownloads.clear({}).catch(() => {}),
+  chrome.contentSettings.popups.clear({}).catch(() => {}),
+]);
 const MAX_LOG = 300;
 const MAX_DEBUG = 10;
 
