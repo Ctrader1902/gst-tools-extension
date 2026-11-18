@@ -136,3 +136,9 @@ test("debugInfo lists controls and selects", () => {
   eq(d.selects.length, 3);
   ok(d.selects[0].options.includes("2025-2026"));
 });
+
+test("docId is stable within one document", () => {
+  const a = P.docId();
+  ok(typeof a === "string" && a.length > 4);
+  eq(P.docId(), a);
+});

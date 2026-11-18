@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>background boot test</title></head>
+<body>
+<script src="harness.js"></script>
+<script src="chrome-stub.js"></script>
+<script src="../background.js"></script>
+<script>
+test("background boots and loads its modules", () => {
+  ok(globalThis.GSTMatch && globalThis.GSTEngine && globalThis.GSTTabs && globalThis.GSTDownloads);
+});
+test("side panel opens on toolbar click", () => {
+  ok(chromeCalls.some((c) => c.path === "chrome.sidePanel.setPanelBehavior"
+                        && c.args[0].openPanelOnActionClick === true));
+});
+test("start without a logged-in portal tab answers login", async () => {
+  const r = await handle({ cmd: "start", taskKey: "gstr2b_json", fy: "2025-26", months: ["June"], mode: "download" });
+  eq(r, { error: "login" });
+});
+test("generate refused for non-R1", async () => {
+  const r = await handle({ cmd: "start", taskKey: "gstr2b_excel", fy: "2025-26", months: ["June"], mode: "generate" });
+  eq(r.error, "Only R1 JSON has a generate step.");
+});
+test("status reports not logged in", async () => {
+  const r = await handle({ cmd: "status" });
+  eq(r.loggedIn, false);
+  eq(r.running, false);
+});
+test("summary wording", () => {
+  const s = summarize("gstr2b_json", { April: { state: "saved" }, June: { state: "pending" } });
+  eq(s, { kind: "warn", text: "GSTR-2B JSON: 1 downloaded, 1 not ready yet." });
+});
+</script>
+</body></html>

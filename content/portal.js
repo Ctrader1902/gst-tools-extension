@@ -51,6 +51,12 @@
   }
 
   const ops = {
+    /** Random id of this document: changes when the page is replaced. */
+    docId() {
+      if (!window.__gstDocId) window.__gstDocId = Math.random().toString(36).slice(2, 12);
+      return window.__gstDocId;
+    },
+
     state() {
       const title = document.title || "";
       const heading = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,.box,p"))
