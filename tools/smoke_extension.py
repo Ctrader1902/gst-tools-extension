@@ -11,7 +11,7 @@ from pathlib import Path
 from selenium import webdriver
 
 ROOT = Path(__file__).resolve().parent.parent
-STATUS_JS = ("const cb = arguments[0]; chrome.runtime.sendMessage(arguments[1])"
+STATUS_JS = ("const cb = arguments[arguments.length - 1]; chrome.runtime.sendMessage(arguments[0])"
              ".then(r => cb(JSON.stringify(r)), e => cb('ERR ' + e.message));")
 
 
