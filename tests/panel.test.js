@@ -71,3 +71,20 @@ test("controls locked while running", async () => {
   eq($("input[name=rtype]:checked").value, "gstr3b_ack", "shows the running type");
   eq($all("input[name=month]:checked").map((c) => c.value), ["May"], "shows the running months");
 });
+
+test("double click on DOWNLOAD sends one start", async () => {
+  await fresh({ loggedIn: true });
+  $("input[value=gstr3b_ack]").click();
+  $("input[name=month][value=May]").click();
+  $("#download").click();
+  $("#download").click();
+  await new Promise((r) => setTimeout(r, 50));
+  eq(sent.filter((m) => m.cmd === "start").length, 1);
+});
+
+test("finished run's status shown on open; expiry offers the portal", async () => {
+  await fresh({ loggedIn: false, run: { done: true, taskKey: "gstr3b_ack", months: ["May"],
+    status: { kind: "err", text: "Session expired - log in to the GST portal again.", expired: true } } });
+  ok($("#status").textContent.startsWith("Session expired"), $("#status").textContent);
+  ok(visible($("#open-portal")), "portal button");
+});

@@ -79,7 +79,7 @@
     changed();
   }
 
-  function changed() { savePrefs(); update(); }
+  function changed() { state.shownStatus = null; savePrefs(); update(); }
 
   function savePrefs() {
     chrome.storage.local.set({ prefs: { fy: els.fy.value, type: chosenType(), months: chosenMonths() } });
@@ -109,18 +109,21 @@
   function update() {
     if (state.running && state.run) showRun(state.run);
     const months = chosenMonths();
-    const idle = !state.running;
+    const idle = !state.running && !state.starting;
     els.download.disabled = !idle || !months.length || !chosenType();
     els.generate.disabled = !idle || !months.length || chosenType() !== "r1_json";
     els.stop.classList.toggle("hidden", idle);
-    els["open-portal"].classList.toggle("hidden", state.loggedIn);
+    const expired = !!(state.shownStatus && state.shownStatus.expired);
+    els["open-portal"].classList.toggle("hidden", state.loggedIn && !expired);
     document.querySelectorAll("input, select").forEach((i) => { i.disabled = !idle; });
     if (state.running && state.run) {
       const r = state.run;
       const t = M.TASKS[r.taskKey];
       const at = Math.min((r.index || 0) + 1, r.months.length);
       setStatus("busy", `Running ${t ? t.title : ""}: month ${at} of ${r.months.length} ...`);
-    } else if (!state.statusLocked) {
+    } else if (state.shownStatus) {
+      setStatus(state.shownStatus.kind, state.shownStatus.text);
+    } else {
       if (state.loggedIn) setStatus("ok", "Logged in to the GST portal.");
       else setStatus("warn", "Please log in to the GST portal in this browser first.");
     }
@@ -148,21 +151,30 @@
     state.running = st.running;
     state.run = st.run;
     if (withLog) renderLog(st.log);
+    // reopening the panel after a run: show how it ended
+    if (withLog && !st.running && st.run && st.run.done && st.run.status) state.shownStatus = st.run.status;
     update();
   }
 
   async function start(mode) {
-    state.statusLocked = false;
-    const r = await send({ cmd: "start", taskKey: chosenType(), fy: els.fy.value,
-                           months: M.MONTHS.filter((m) => chosenMonths().includes(m)), mode });
-    if (r && r.error === "login") {
-      state.loggedIn = false;
+    if (state.starting || state.running) return;      // a double click starts one run
+    state.starting = true;
+    state.shownStatus = null;
+    update();
+    try {
+      const r = await send({ cmd: "start", taskKey: chosenType(), fy: els.fy.value,
+                             months: M.MONTHS.filter((m) => chosenMonths().includes(m)), mode });
+      if (r && r.error === "login") {
+        state.loggedIn = false;
+        state.shownStatus = { kind: "warn", text: "Please log in to the GST portal first, then press the button again." };
+        return;
+      }
+      if (r && r.error) { state.shownStatus = { kind: "err", text: r.error }; return; }
+      els.log.textContent = "";
+    } finally {
+      state.starting = false;
       update();
-      setStatus("warn", "Please log in to the GST portal first, then press the button again.");
-      return;
     }
-    if (r && r.error) { setStatus("err", r.error); return; }
-    els.log.textContent = "";
     await refresh();
   }
 
@@ -171,8 +183,8 @@
     const text = JSON.stringify((r && r.debug) || [], null, 2);
     try {
       await navigator.clipboard.writeText(text);
-      state.statusLocked = true;
-      setStatus("ok", "Debug info copied - paste it into a message to the person who supports you.");
+      state.shownStatus = { kind: "ok", text: "Debug info copied - paste it into a message to the person who supports you." };
+      update();
     } catch (e) {
       setStatus("err", "Could not copy debug info.");
     }
@@ -185,6 +197,8 @@
 
   async function init({ poll = true } = {}) {
     const root = document.getElementById("app");
+    state.shownStatus = null;
+    state.starting = false;
     build(root);
     await restorePrefs();
     await refresh(true);
@@ -196,10 +210,8 @@
         if (msg.evt === "progress") { state.run = msg.run; update(); }
         if (msg.evt === "done") {
           state.running = false;
-          state.statusLocked = true;
+          state.shownStatus = msg.status;
           update();
-          setStatus(msg.status.kind, msg.status.text);
-          setTimeout(() => { state.statusLocked = false; }, 15000);
         }
       });
     }

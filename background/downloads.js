@@ -4,13 +4,14 @@
 "use strict";
 (function () {
   const M = globalThis.GSTMatch;
-  let armed = null;          // {tag, fy, month} while a run expects files
+  let armed = null;          // {tag, fy, month} of the month being run
+  let expecting = false;     // a click that may download is waiting for its file
   let tracked = new Map();   // id -> {id, created, state, filename, meta}
   let lastId = null;
 
   function track(item) {
     if (tracked.has(item.id)) return tracked.get(item.id);
-    if (!armed || !M.isPortalDownload(item)) return null;
+    if (!armed || !expecting || !M.isPortalDownload(item)) return null;
     const rec = { id: item.id, created: Date.now(), state: item.state || "in_progress",
                   filename: item.filename || "", meta: { ...armed } };
     tracked.set(item.id, rec);
@@ -40,6 +41,7 @@
     /** Hook into chrome.downloads (or a fake in tests).  Resets tracking. */
     install(api) {
       armed = null;
+      expecting = false;
       tracked = new Map();
       lastId = null;
       api.onCreated.addListener(onCreated);
@@ -47,17 +49,22 @@
       api.onChanged.addListener(onChanged);
     },
     arm(meta) { armed = { tag: meta.tag, fy: meta.fy, month: meta.month }; },
-    disarm() { armed = null; },
+    disarm() { armed = null; expecting = false; },
+    /** Open / close the window in which portal downloads belong to this month. */
+    expect() { expecting = true; },
+    settle() { expecting = false; },
     hasNew(sinceMs) { return since(sinceMs).length > 0; },
     lastSavedId() { return lastId; },
 
     /** Wait for downloads started at/after sinceMs to finish.  Returns the
      *  completed ones once nothing is in progress for stableMs; [] on timeout.
-     *  The deadline moves out while data is still flowing. */
-    async waitNew(sinceMs, timeoutMs, stableMs = 1000) {
+     *  The deadline moves out while data is still flowing.  stopCheck() is
+     *  called every pass and may throw to abandon the wait. */
+    async waitNew(sinceMs, timeoutMs, stableMs = 1000, stopCheck = () => {}) {
       let end = Date.now() + timeoutMs;
       let quietSince = null;
       while (Date.now() < end) {
+        stopCheck();                 // throws when the run was stopped
         const recs = since(sinceMs);
         const done = recs.filter((r) => r.state === "complete");
         const busy = recs.filter((r) => r.state === "in_progress");

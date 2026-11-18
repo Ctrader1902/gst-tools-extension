@@ -26,3 +26,13 @@ Log in to the portal in Chrome, then open the GST Tools panel.
 | 15 | Open folder | opens the folder with the last saved file | |
 
 Note any failure with the Activity log and the Copy debug info text.
+
+## Added after code review
+
+| # | Test | Expected | Result |
+|---|------|----------|--------|
+| 16 | R1 JSON DOWNLOAD for a month with 2+ files | every File 1..n saved, not just File 1 | |
+| 17 | Double-click DOWNLOAD | only one run starts | |
+| 18 | Press Stop while a PDF is being prepared | stops within a few seconds | |
+| 19 | Session expires during a run, then reopen the panel | status says "Session expired - log in…" with Open GST portal; "Logged in" only after you load a portal page again | |
+| 20 | First run after logging in (the run tab is a copy of your portal tab) | no "Access Denied"; months run | |

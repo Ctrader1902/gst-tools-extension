@@ -48,5 +48,40 @@ test("summary wording", () => {
   const s = summarize("gstr2b_json", { April: { state: "saved" }, June: { state: "pending" } });
   eq(s, { kind: "warn", text: "GSTR-2B JSON: 1 downloaded, 1 not ready yet." });
 });
+test("session expiry becomes the status, and logged-in waits for a fresh portal page", async () => {
+  const s = summarize("gstr3b_ack", { April: { state: "saved" },
+    May: { state: "not_run", note: "GST session has expired - log in again." } });
+  eq(s.expired, true);
+  eq(s.kind, "err");
+  ok(s.text.startsWith("Session expired - log in to the GST portal again"), s.text);
+  const authTab = { id: 5, windowId: 1, index: 0, url: "https://services.gst.gov.in/services/auth/dashboard" };
+  chromeAnswers["chrome.tabs.query"] = () => [authTab];
+  sessionExpired = true;
+  eq((await handle({ cmd: "status" })).loggedIn, false, "old tab after expiry");
+  chromeEvents["chrome.tabs.onUpdated"].fns.forEach((f) => f(5, { status: "complete" }, authTab));
+  eq((await handle({ cmd: "status" })).loggedIn, true, "after a fresh portal page");
+  chromeAnswers["chrome.tabs.query"] = () => [];
+});
+test("sleep and download waits notice Stop", async () => {
+  stopReason = "Stopped by you.";
+  let e1 = null, e2 = null;
+  try { await makeCtx().sleep(5); } catch (e) { e1 = e; }
+  try { await makeCtx().downloads.waitNew(0, 1000); } catch (e) { e2 = e; }
+  stopReason = null;
+  ok(e1 instanceof GSTEngine.Stopped, "sleep");
+  ok(e2 instanceof GSTEngine.Stopped, "waitNew");
+});
+test("a second start while the first is starting is refused", async () => {
+  const authTab = { id: 5, windowId: 1, index: 0, url: "https://services.gst.gov.in/services/auth/dashboard" };
+  chromeAnswers["chrome.tabs.query"] = () => [authTab];
+  chromeAnswers["chrome.tabs.duplicate"] = () => ({ id: 9, windowId: 1, index: 1 });
+  chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
+  const msg = { cmd: "start", taskKey: "gstr3b_ack", fy: "2025-26", months: ["May"], mode: "download" };
+  const [a, b] = await Promise.all([handle(msg), handle(msg)]);
+  eq([a.ok || a.error, b.ok || b.error].sort(), [true, "A run is already in progress."].sort());
+  stopReason = "Stopped by you.";           // end the stub run quickly
+  for (let i = 0; i < 100 && (running || starting); i++) await new Promise((r) => setTimeout(r, 50));
+  chromeAnswers["chrome.tabs.query"] = () => [];
+});
 </script>
 </body></html>

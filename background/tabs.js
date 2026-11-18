@@ -3,15 +3,26 @@
 "use strict";
 (function () {
   const PORTAL_URLS = ["https://services.gst.gov.in/*", "https://return.gst.gov.in/*"];
-  const SERVICES_DASHBOARD_URL = "https://services.gst.gov.in/services/auth/dashboard";
 
   let runTab = null;        // the tab the run opened
   let current = null;       // the tab page ops go to (runTab or a tab it opened)
   const extra = new Set();  // tabs opened from the run's tabs
   let fresh = [];           // newly opened, not yet followed
   let stopCheck = () => {};
+  const timeouts = { message: 30000 };
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** A page blocked by a dialog never answers: give up after a while and
+   *  treat it like a page that went away (the caller re-injects and retries). */
+  function withTimeout(promise, label) {
+    let timer;
+    const limit = new Promise((_r, reject) => {
+      timer = setTimeout(() => reject(new Error(`Receiving end does not exist (no answer to ${label})`)),
+                         timeouts.message);
+    });
+    return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+  }
 
   chrome.tabs.onCreated.addListener((tab) => {
     if (runTab == null || tab.openerTabId == null) return;
@@ -44,8 +55,9 @@
 
   /** Content script + alert/confirm auto-accept in the page's own world. */
   async function inject(tabId) {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["lib/match.js", "content/portal.js"] });
-    await chrome.scripting.executeScript({
+    await withTimeout(chrome.scripting.executeScript(
+      { target: { tabId }, files: ["lib/match.js", "content/portal.js"] }), "inject");
+    await withTimeout(chrome.scripting.executeScript({
       target: { tabId }, world: "MAIN",
       func: () => {
         if (window.__gstAlerts) return;
@@ -55,7 +67,7 @@
         window.confirm = (m) => { note(m); return true; };
         window.prompt = (m) => { note(m); return ""; };
       },
-    });
+    }), "inject");
   }
 
   const PORT_GONE = /port closed|receiving end does not exist|could not establish connection|frame.*removed|no tab with id/i;
@@ -66,7 +78,7 @@
     for (let attempt = 0; attempt < 5; attempt++) {
       stopCheck();
       try {
-        const res = await chrome.tabs.sendMessage(current, { op, args }, { frameId: 0 });
+        const res = await withTimeout(chrome.tabs.sendMessage(current, { op, args }, { frameId: 0 }), op);
         if (res === undefined) throw new Error("Receiving end does not exist (no reply)");
         if (res.error) throw Object.assign(new Error(res.error), { fromPage: true });
         return res.value;
@@ -93,6 +105,7 @@
   globalThis.GSTTabs = {
     page,
     setStopCheck(fn) { stopCheck = fn; },
+    setTimeouts(t) { Object.assign(timeouts, t); },
     runTabId: () => runTab,
 
     /** A tab with a signed-in portal page (URL path has /auth/), not the run tab. */
@@ -101,12 +114,12 @@
       return tabs.find((t) => t.id !== runTab && t.url && /\/auth\//.test(new URL(t.url).pathname)) || null;
     },
 
-    async openRunTab(nextTo) {
-      const tab = await chrome.tabs.create({
-        url: SERVICES_DASHBOARD_URL, active: true,
-        windowId: nextTo ? nextTo.windowId : undefined,
-        index: nextTo ? nextTo.index + 1 : undefined,
-      });
+    /** Open the run's tab as a duplicate of the user's signed-in portal tab.
+     *  A typed-in URL in a fresh tab is refused with "Access Denied"; a
+     *  duplicate carries the tab's portal session along. */
+    async openRunTab(portalTab) {
+      const tab = await chrome.tabs.duplicate(portalTab.id);
+      if (!tab || tab.id == null) throw new Error("Could not open a copy of the GST portal tab.");
       this.adopt(tab.id);
       await waitComplete(tab.id, 60000);
       return tab.id;
@@ -147,7 +160,7 @@
       while (Date.now() < end) {
         let pending = 0;
         try {
-          const [r] = await chrome.scripting.executeScript({
+          const [r] = await withTimeout(chrome.scripting.executeScript({
             target: { tabId: current }, world: "MAIN",
             func: () => {
               try {
@@ -155,7 +168,7 @@
                 return inj ? inj.get("$http").pendingRequests.length : 0;
               } catch (e) { return 0; }
             },
-          });
+          }), "idle check");
           pending = r ? r.result : 0;
         } catch (e) { pending = 0; }
         if (!pending) break;
@@ -166,10 +179,10 @@
 
     async takeAlerts() {
       try {
-        const [r] = await chrome.scripting.executeScript({
+        const [r] = await withTimeout(chrome.scripting.executeScript({
           target: { tabId: current }, world: "MAIN",
           func: () => (window.__gstAlerts ? window.__gstAlerts.splice(0) : []),
-        });
+        }), "alerts");
         return (r && r.result) || [];
       } catch (e) { return []; }
     },
@@ -189,13 +202,16 @@
       return false;
     },
 
-    async closeExtraTabs() {
+    /** Close tabs the run opened.  keepCurrent: keep the tab page ops go to
+     *  (e.g. the offline-download page with more parts still to fetch). */
+    async closeExtraTabs({ keepCurrent = false } = {}) {
       for (const id of [...extra]) {
+        if (keepCurrent && id === current) continue;
         try { await chrome.tabs.remove(id); } catch (e) { /* already gone */ }
+        extra.delete(id);
       }
-      extra.clear();
       fresh = [];
-      current = runTab;
+      if (!keepCurrent) current = runTab;
     },
 
     async closeRunTab() {

@@ -17,7 +17,7 @@ const PORTAL = { referrer: "https://return.gst.gov.in/returns/auth/gstr2b", url:
 
 test("renames portal download while armed", () => {
   const api = fakeApi(); D.install(api);
-  D.arm({ tag: "GSTR1_ACK", fy: "2025-26", month: "April" });
+  D.arm({ tag: "GSTR1_ACK", fy: "2025-26", month: "April" }); D.expect();
   const s = create(api, { id: 1, filename: "x.pdf", ...PORTAL });
   eq(s, { filename: "GST Downloads/GSTR1_ACK_2025-26_April_x.pdf", conflictAction: "uniquify" });
   D.disarm();
@@ -39,7 +39,7 @@ test("ignores download while disarmed", () => {
 test("waitNew resolves after complete", async () => {
   const api = fakeApi(); D.install(api);
   const since = Date.now();
-  D.arm({ tag: "T", fy: "2025-26", month: "June" });
+  D.arm({ tag: "T", fy: "2025-26", month: "June" }); D.expect();
   create(api, { id: 4, filename: "c.json", ...PORTAL });
   eq(D.hasNew(since), true);
   const p = D.waitNew(since, 3000, 50);
@@ -60,9 +60,30 @@ test("waitNew returns [] on timeout", async () => {
 test("interrupted download is not returned", async () => {
   const api = fakeApi(); D.install(api);
   const since = Date.now();
-  D.arm({ tag: "T", fy: "2025-26", month: "Jul" });
+  D.arm({ tag: "T", fy: "2025-26", month: "Jul" }); D.expect();
   create(api, { id: 5, filename: "d.json", ...PORTAL });
   change(api, { id: 5, state: { current: "interrupted" } });
   eq(await D.waitNew(since, 300, 10), []);
   D.disarm();
+});
+
+test("late file between waits is not renamed or counted", () => {
+  const api = fakeApi(); D.install(api);
+  const since = Date.now();
+  D.arm({ tag: "T", fy: "2025-26", month: "Aug" });          // month armed, no click waiting
+  eq(create(api, { id: 6, filename: "late.json", ...PORTAL }), undefined);
+  D.expect(); D.settle();                                     // a click's wait finished
+  eq(create(api, { id: 7, filename: "later.json", ...PORTAL }), undefined);
+  eq(D.hasNew(since), false);
+  D.disarm();
+});
+
+test("waitNew stops when the run is stopped", async () => {
+  const api = fakeApi(); D.install(api);
+  let calls = 0;
+  let err = null;
+  try {
+    await D.waitNew(Date.now(), 5000, 10, () => { if (++calls > 2) throw new Error("stopped"); });
+  } catch (e) { err = e; }
+  eq(err && err.message, "stopped");
 });

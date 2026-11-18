@@ -13,8 +13,10 @@ GSTDownloads.install(chrome.downloads);
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
 let running = null;        // promise of the active run
+let starting = false;      // start()/resume() is setting a run up
 let stopReason = null;     // set by Stop or by closing the run tab
 let keepAlive = null;
+let sessionExpired = false; // last run hit an expired session: wait for a fresh portal page
 
 // ------------------------------------------------------------------ log --
 let logQueue = Promise.resolve();
@@ -30,26 +32,40 @@ function log(text, kind = "") {
 const broadcast = (evt, data) => chrome.runtime.sendMessage({ evt, ...data }).catch(() => {});
 
 // ---------------------------------------------------------------- run --
-T.setStopCheck(() => { if (stopReason) throw new E.Stopped(stopReason); });
+const checkStop = () => { if (stopReason) throw new E.Stopped(stopReason); };
+T.setStopCheck(checkStop);
 
 chrome.tabs.onRemoved.addListener((id) => {
-  if (running && id === T.runTabId()) stopReason = "Run tab was closed - run stopped.";
+  if ((running || starting) && id === T.runTabId()) stopReason = "Run tab was closed - run stopped.";
+});
+
+// After an expired session, "logged in" needs a portal page loaded afresh.
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (!sessionExpired || info.status !== "complete" || tabId === T.runTabId() || !tab || !tab.url) return;
+  try {
+    if (/\/auth\//.test(new URL(tab.url).pathname)) sessionExpired = false;
+  } catch (e) { /* not a URL */ }
 });
 
 function makeCtx() {
   return {
     page: T.page,
     now: () => Date.now(),
-    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    async sleep(ms) {
+      checkStop();
+      await new Promise((r) => setTimeout(r, ms));
+      checkStop();
+    },
     log: (m) => log(m),
-    downloads: GSTDownloads,
+    downloads: { ...GSTDownloads,
+                 waitNew: (since, ms) => GSTDownloads.waitNew(since, ms, 1000, checkStop) },
     gotoUrl: (url) => T.gotoUrl(url),
     waitNavigation: (doc, ms) => T.waitNavigation(doc, ms),
     waitIdle: (ms) => T.waitIdle(ms),
     followNewTab: () => T.followNewTab(),
     closeExtraTabs: () => T.closeExtraTabs(),
     takeAlerts: () => T.takeAlerts(),
-    checkStop: () => { if (stopReason) throw new E.Stopped(stopReason); },
+    checkStop,
     async saveDebug(tag, note) {
       let info = {};
       try { info = await T.page.debugInfo(); } catch (e) { info = { error: String(e.message || e) }; }
@@ -87,11 +103,16 @@ function summarize(taskKey, results) {
   if (s.failed.length) parts.push(`${s.failed.length} failed`);
   if (s.notRun.length) parts.push(`${s.notRun.length} not run`);
   const kind = s.failed.length || s.notRun.length ? "err" : s.pending.length ? "warn" : "ok";
-  return { kind, text: `${title}: ${parts.join(", ") || "nothing done"}.` };
+  const text = `${title}: ${parts.join(", ") || "nothing done"}.`;
+  const expired = s.notRun.some((m) => /log in again/i.test((results[m] && results[m].note) || ""));
+  if (expired) {
+    return { kind: "err", expired: true,
+             text: `Session expired - log in to the GST portal again, then start the run again. ${text}` };
+  }
+  return { kind, text };
 }
 
 function runIt(run) {
-  stopReason = null;
   keepAlive = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
   running = (async () => {
     let status;
@@ -99,6 +120,7 @@ function runIt(run) {
       const results = await E.runBatch(makeCtx(), run.taskKey, run.fy, run.months, run.mode,
                                        run.index || 0, run.results || {});
       status = summarize(run.taskKey, results);
+      if (status.expired) sessionExpired = true;
     } catch (e) {
       log(`ERROR: ${e.message || e}`, "err");
       status = { kind: "err", text: String(e.message || e) };
@@ -114,32 +136,45 @@ function runIt(run) {
 }
 
 async function start({ taskKey, fy, months, mode }) {
-  if (running) return { error: "A run is already in progress." };
+  if (running || starting) return { error: "A run is already in progress." };
   if (!M.TASKS[taskKey] || !months || !months.length) return { error: "Choose a return type and months." };
   if (mode === "generate" && taskKey !== "r1_json") return { error: "Only R1 JSON has a generate step." };
-  const portal = await T.findLoggedInPortalTab();
-  if (!portal) return { error: "login" };
-  const order = M.MONTHS.filter((m) => months.includes(m));
-  await chrome.storage.session.set({ log: [] });
-  const tabId = await T.openRunTab(portal);
-  const run = { taskKey, fy, months: order, mode, index: 0, results: {}, tabId, done: false };
-  await chrome.storage.session.set({ run });
-  runIt(run);
-  return { ok: true };
+  starting = true;                     // set before the first await: no second run
+  stopReason = null;
+  try {
+    const portal = sessionExpired ? null : await T.findLoggedInPortalTab();
+    if (!portal) return { error: "login" };
+    const order = M.MONTHS.filter((m) => months.includes(m));
+    await chrome.storage.session.set({ log: [] });
+    const tabId = await T.openRunTab(portal);
+    const run = { taskKey, fy, months: order, mode, index: 0, results: {}, tabId, done: false };
+    await chrome.storage.session.set({ run });
+    runIt(run);
+    return { ok: true };
+  } finally {
+    starting = false;
+  }
 }
 
 /** The worker was restarted while a run was going on: carry on. */
 async function resume() {
-  const { run } = await chrome.storage.session.get("run");
-  if (!run || run.done || running) return;
-  if (!(await T.tabExists(run.tabId))) {
-    await chrome.storage.session.set({ run: { ...run, done: true,
-      status: { kind: "err", text: "Run tab was closed - run stopped." } } });
-    return;
+  if (running || starting) return;
+  starting = true;
+  try {
+    const { run } = await chrome.storage.session.get("run");
+    if (!run || run.done || running) return;
+    if (!(await T.tabExists(run.tabId))) {
+      await chrome.storage.session.set({ run: { ...run, done: true,
+        status: { kind: "err", text: "Run tab was closed - run stopped." } } });
+      return;
+    }
+    stopReason = null;
+    T.adopt(run.tabId);
+    log(`Resuming after a pause at ${run.months[run.index] || "the end"} ...`, "warn");
+    runIt(run);
+  } finally {
+    starting = false;
   }
-  T.adopt(run.tabId);
-  log(`Resuming after a pause at ${run.months[run.index] || "the end"} ...`, "warn");
-  runIt(run);
 }
 resume();
 
@@ -150,12 +185,13 @@ async function handle(msg) {
       const [{ run }, { log: lines = [] }, portal] = await Promise.all([
         chrome.storage.session.get("run"), chrome.storage.session.get("log"),
         T.findLoggedInPortalTab()]);
-      return { loggedIn: !!portal, running: !!running, run: run || null, log: lines };
+      return { loggedIn: !!portal && !sessionExpired, running: !!running || starting,
+               run: run || null, log: lines };
     }
     case "start":
       return start(msg);
     case "stop":
-      if (running) { stopReason = "Stopped by you."; log("Stopping after the current step ...", "warn"); }
+      if (running || starting) { stopReason = "Stopped by you."; log("Stopping after the current step ...", "warn"); }
       return { ok: true };
     case "openPortal":
       await chrome.tabs.create({ url: LOGIN_URL });

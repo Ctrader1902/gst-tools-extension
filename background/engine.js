@@ -47,8 +47,19 @@
     if (pressed) await ctx.sleep(800);
   }
 
+  /** Click something that may start a download: files only count (and get
+   *  renamed) between this click and the end of its wait. */
+  async function clickForFile(ctx, id) {
+    ctx.downloads.expect();
+    await ctx.page.click(id);
+  }
+
   async function waitFiles(ctx, since, ms) {
-    return (await ctx.downloads.waitNew(since, ms)).map((d) => d.filename);
+    try {
+      return (await ctx.downloads.waitNew(since, ms)).map((d) => d.filename);
+    } finally {
+      ctx.downloads.settle();
+    }
   }
 
   // ---------------------------------------------------------- navigation --
@@ -165,7 +176,7 @@
       const btn = await waitControl(ctx, M.JSON_RX, 20000);
       if (!btn) throw new Error("No 'Generate JSON' button on this page.");
       ctx.log(`Clicking '${btn.text}' ...`);
-      await ctx.page.click(btn.id);
+      await clickForFile(ctx, btn.id);
       await ctx.sleep(1000);
       await acceptDialogs(ctx);
       links = (await poll(ctx, 12000, async () => {
@@ -176,6 +187,7 @@
     if (ctx.downloads.hasNew(since)) {             // portal handed it over at once
       return { state: "saved", files: await waitFiles(ctx, since, 60000), note: "" };
     }
+    ctx.downloads.settle();
     if (links.length) {
       const again = await first(ctx, "generate new|regenerate|new json|generate again");
       if (again) {
@@ -206,7 +218,7 @@
     if (!btn) throw new Error("No JSON download button on this page.");
     ctx.log(`Clicking '${btn.text}' ...`);
     const since = ctx.now();
-    await ctx.page.click(btn.id);
+    await clickForFile(ctx, btn.id);
     await ctx.sleep(1000);
     await acceptDialogs(ctx);
 
@@ -217,6 +229,7 @@
       return links.length ? { links } : null;
     });
     if (got && got.files) return waitFiles(ctx, since, 60000);
+    ctx.downloads.settle();
     if (got && got.links) return clickLinks(ctx, got.links);
 
     const msg = await ctx.page.pageMessage();
@@ -236,7 +249,7 @@
     const before = (await ctx.page.controls(M.LINK_RX)).length;   // e.g. JSON links already shown
     ctx.log(`Clicking '${btn.text}' ...`);
     const since = ctx.now();
-    await ctx.page.click(btn.id);
+    await clickForFile(ctx, btn.id);
     await ctx.sleep(1000);
     await acceptDialogs(ctx);
 
@@ -246,6 +259,7 @@
       return links.length > before ? { links } : null;
     });
     if (got && got.files) return waitFiles(ctx, since, 120000);
+    ctx.downloads.settle();
     if (got && got.links) return clickLinks(ctx, got.links, before);
 
     const msg = await ctx.page.pageMessage();
@@ -262,10 +276,10 @@
       const label = await ctx.page.rowLabel(fresh[i].id);
       ctx.log(`Downloading part ${i + 1 - start}/${count - start} (${label}) ...`);
       const since = ctx.now();
-      await ctx.page.click(fresh[i].id);
+      await clickForFile(ctx, fresh[i].id);
       await acceptDialogs(ctx);
       saved.push(...await waitFiles(ctx, since, 120000));
-      await ctx.closeExtraTabs();
+      await ctx.closeExtraTabs({ keepCurrent: true });   // keep the page with the links
     }
     return saved;
   }
@@ -303,7 +317,7 @@
     }
     ctx.log(`${task.ret} row: ${btn.text || "button"}`);
     const since = ctx.now();
-    await ctx.page.click(btn.id);
+    await clickForFile(ctx, btn.id);
     await ctx.sleep(2000);
     await acceptDialogs(ctx);
 
@@ -327,7 +341,7 @@
     }, 700);
     if (!dl) throw new Error("Opened the filed return but found no 'DOWNLOAD (PDF)' button.");
     ctx.log(`Clicking '${dl.text}' ...`);
-    await ctx.page.click(dl.id);
+    await clickForFile(ctx, dl.id);
     await ctx.sleep(1500);
     await acceptDialogs(ctx);
     files = await waitFiles(ctx, since, 120000);          // the PDF is built on demand

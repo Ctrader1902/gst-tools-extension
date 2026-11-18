@@ -23,7 +23,8 @@ function fakeWorld(spec = {}) {
     click: async (id) => {
       if (id === "search") { w.searches = (w.searches || 0) + 1; return true; }
       w.clicks.push(id);
-      if ((spec.fileOn || []).includes(id)) w.pending.push({ id: ++fileNo, filename: `C:\\d\\f${fileNo}.bin` });
+      // a download only counts while the engine has opened a download window
+      if ((spec.fileOn || []).includes(id) && w.expecting) w.pending.push({ id: ++fileNo, filename: `C:\\d\\f${fileNo}.bin` });
       if (spec.onClick) spec.onClick(w, id);
       return true;
     },
@@ -40,15 +41,17 @@ function fakeWorld(spec = {}) {
     log: (m) => w.logs.push(m),
     downloads: {
       arm: (meta) => { w.month = meta.month; w.armed.push(meta.month); },
-      disarm: () => {},
+      disarm: () => { w.expecting = false; },
+      expect: () => { w.expecting = true; },
+      settle: () => { w.expecting = false; },
       hasNew: () => w.pending.length > 0,
       waitNew: async () => w.pending.splice(0),
     },
     gotoUrl: async () => {},
     waitNavigation: async () => {},
     waitIdle: async () => {},
-    followNewTab: async () => false,
-    closeExtraTabs: async () => {},
+    followNewTab: async () => { if (spec.newTab && !w.inNewTab) { w.inNewTab = true; return true; } return false; },
+    closeExtraTabs: async (opts) => { if (!(opts && opts.keepCurrent)) w.inNewTab = false; },
     takeAlerts: async () => [],
     checkStop: () => { if (w.flags.stop) throw new E.Stopped("Run tab was closed - run stopped."); },
     saveDebug: async (tag, note) => { w.debug.push({ tag, note }); },
@@ -190,4 +193,18 @@ test("resume", async () => {
   eq(res.May.state, "saved");
   eq(w.armed, ["May"]);
   eq(w.persisted[w.persisted.length - 1].index, 2);
+});
+
+test("multi-part download keeps working in a tab the tile opened", async () => {
+  const w = fakeWorld({
+    newTab: true,
+    controls: {
+      [MM.JSON_RX]: (w) => (w.inNewTab ? [{ id: "json", text: "GENERATE JSON" }] : []),
+      [MM.LINK_RX]: (w) => (w.inNewTab && w.clicks.includes("json") ? L(2) : []),
+    },
+    fileOn: ["l0", "l1"],
+  });
+  const r = await E.runMonth(w.ctx, MM.TASKS.gstr2b_json, "2025-26", "June", "download");
+  eq(w.clicks, ["tile", "json", "l0", "l1"]);
+  eq(r.files.length, 2);
 });

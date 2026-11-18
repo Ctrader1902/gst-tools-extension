@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>tabs tests</title></head>
+<body>
+<script src="harness.js"></script>
+<script src="chrome-stub.js"></script>
+<script src="../lib/match.js"></script>
+<script src="../background/tabs.js"></script>
+<script>
+test("a page that never answers times out and is retried", async () => {
+  let n = 0;
+  chromeAnswers["chrome.tabs.sendMessage"] = () => (++n === 1 ? new Promise(() => {}) : { value: 42 });
+  chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
+  GSTTabs.setTimeouts({ message: 100 });
+  GSTTabs.adopt(3);
+  eq(await GSTTabs.page.state(), 42);
+  eq(n, 2);
+});
+test("run tab is a duplicate of the user's logged-in tab (keeps the portal session)", async () => {
+  chromeAnswers["chrome.tabs.duplicate"] = (id) => ({ id: 77, windowId: 1, index: 2, openerTabId: id });
+  chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
+  const id = await GSTTabs.openRunTab({ id: 5, windowId: 1, index: 1 });
+  eq(id, 77);
+  ok(chromeCalls.some((c) => c.path === "chrome.tabs.duplicate" && c.args[0] === 5), "duplicated tab 5");
+  ok(!chromeCalls.some((c) => c.path === "chrome.tabs.create"), "no fresh tab typed in");
+});
+</script>
+</body></html>
