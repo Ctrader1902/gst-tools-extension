@@ -6,6 +6,14 @@ const M = globalThis.GSTMatch;
 const E = globalThis.GSTEngine;
 const T = globalThis.GSTTabs;
 const LOGIN_URL = "https://services.gst.gov.in/services/login";
+const GST_SITES = "https://*.gst.gov.in/*";
+
+/** GSTR-2B has several files per month.  Chrome blocks a site's second
+ *  automatic download unless allowed, so allow it for GST sites during a run. */
+const allowGstDownloads = () =>
+  chrome.contentSettings.automaticDownloads.set({ primaryPattern: GST_SITES, setting: "allow" }).catch(() => {});
+const restoreDownloadSetting = () =>
+  chrome.contentSettings.automaticDownloads.clear({}).catch(() => {});
 const MAX_LOG = 300;
 const MAX_DEBUG = 10;
 
@@ -126,11 +134,14 @@ function runIt(run) {
       status = { kind: "err", text: String(e.message || e) };
     } finally {
       clearInterval(keepAlive);
-      const { run: saved } = await chrome.storage.session.get("run");
-      await chrome.storage.session.set({ run: { ...saved, done: true, status } });
-      await T.closeRunTab();
-      running = null;
+      try {
+        const { run: saved } = await chrome.storage.session.get("run");
+        await chrome.storage.session.set({ run: { ...saved, done: true, status } });
+      } catch (e) { /* the run is over either way */ }
+      running = null;                    // finished first: tidying up may never complete
       broadcast("done", { status });
+      restoreDownloadSetting();
+      T.closeRunTab().catch(() => {});
     }
   })();
 }
@@ -146,6 +157,7 @@ async function start({ taskKey, fy, months, mode }) {
     if (!portal) return { error: "login" };
     const order = M.MONTHS.filter((m) => months.includes(m));
     await chrome.storage.session.set({ log: [] });
+    await allowGstDownloads();
     const tabId = await T.openRunTab(portal);
     const run = { taskKey, fy, months: order, mode, index: 0, results: {}, tabId, done: false };
     await chrome.storage.session.set({ run });
@@ -169,6 +181,7 @@ async function resume() {
       return;
     }
     stopReason = null;
+    await allowGstDownloads();
     T.adopt(run.tabId);
     log(`Resuming after a pause at ${run.months[run.index] || "the end"} ...`, "warn");
     runIt(run);

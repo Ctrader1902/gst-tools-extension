@@ -26,6 +26,21 @@ test("a page the extension may not open gives a clear error", async () => {
      err && err.message);
   chromeAnswers["chrome.tabs.sendMessage"] = () => undefined;
 });
+test("injected page helper blocks 'Leave site?' checks", async () => {
+  chromeAnswers["chrome.tabs.sendMessage"] = () => ({ value: 1 });
+  GSTTabs.adopt(3);
+  await GSTTabs.inject(3);
+  const main = chromeCalls.filter((c) => c.path === "chrome.scripting.executeScript" && c.args[0].world === "MAIN")
+    .map((c) => c.args[0].func).find((f) => String(f).includes("__gstAlerts"));
+  ok(main, "MAIN-world helper injected");
+  main();
+  let called = 0;
+  window.addEventListener("beforeunload", () => { called++; });
+  window.onbeforeunload = () => "Leave?";
+  window.dispatchEvent(new Event("beforeunload"));
+  eq(called, 0, "listener ignored");
+  eq(window.onbeforeunload, null, "handler ignored");
+});
 test("run tab is a duplicate of the user's logged-in tab (keeps the portal session)", async () => {
   chromeAnswers["chrome.tabs.duplicate"] = (id) => ({ id: 77, windowId: 1, index: 2, openerTabId: id });
   chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });

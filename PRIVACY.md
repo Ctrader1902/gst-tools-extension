@@ -33,6 +33,7 @@ log in to the portal yourself.
 | storage | To remember your choices and the activity log |
 | scripting | To run the page helper inside the run's portal tab |
 | sidePanel | To show the GST Tools panel |
+| contentSettings | During a run only, to let GST portal sites (*.gst.gov.in) download several files in a row (GSTR-2B has more than one file); the setting is removed when the run ends |
 
 ## Contact
 

@@ -67,6 +67,16 @@
         window.alert = (m) => { note(m); };
         window.confirm = (m) => { note(m); return true; };
         window.prompt = (m) => { note(m); return ""; };
+        // no "Leave site?" checks in the run's tab: they would stop it closing
+        window.onbeforeunload = null;
+        try {
+          Object.defineProperty(window, "onbeforeunload", { configurable: true, get: () => null, set: () => {} });
+        } catch (e) { /* keep going */ }
+        const add = window.addEventListener;
+        window.addEventListener = function (type, ...rest) {
+          if (String(type).toLowerCase() === "beforeunload") return undefined;
+          return add.call(this, type, ...rest);
+        };
       },
     }), "inject");
   }
@@ -111,6 +121,7 @@
     page,
     setStopCheck(fn) { stopCheck = fn; },
     setTimeouts(t) { Object.assign(timeouts, t); },
+    inject,
     runTabId: () => runTab,
 
     /** A tab with a signed-in portal page (URL path has /auth/), not the run tab. */

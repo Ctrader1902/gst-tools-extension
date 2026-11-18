@@ -24,7 +24,7 @@ CHROME_PATHS = [
     os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
 ]
 
-PERMISSIONS = ["sidePanel", "downloads", "storage", "scripting"]
+PERMISSIONS = ["sidePanel", "downloads", "storage", "scripting", "contentSettings"]
 HOSTS = ["https://*.gst.gov.in/*"]
 
 

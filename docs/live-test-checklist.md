@@ -36,3 +36,5 @@ Note any failure with the Activity log and the Copy debug info text.
 | 18 | Press Stop while a PDF is being prepared | stops within a few seconds | |
 | 19 | Session expires during a run, then reopen the panel | status says "Session expired - log in…" with Open GST portal; "Logged in" only after you load a portal page again | |
 | 20 | First run after logging in (the run tab is a copy of your portal tab) | no "Access Denied"; months run | |
+| 21 | GSTR-2B JSON and Excel, one month | **all** parts saved (Summary + Details Part 1..n) | |
+| 22 | Any run, after the last file | panel leaves "Running" within seconds; status shows the summary | |

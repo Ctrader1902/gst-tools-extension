@@ -87,3 +87,14 @@ test("waitNew stops when the run is stopped", async () => {
   } catch (e) { err = e; }
   eq(err && err.message, "stopped");
 });
+
+test("a download stuck in progress does not keep the run waiting forever", async () => {
+  const api = fakeApi(); D.install(api);
+  const since = Date.now();
+  D.arm({ tag: "T", fy: "2025-26", month: "Sep" }); D.expect();
+  create(api, { id: 8, filename: "stuck.pdf", state: "in_progress", ...PORTAL });
+  const t0 = Date.now();
+  eq(await D.waitNew(since, 50, 10, () => {}, 200), []);
+  ok(Date.now() - t0 < 2000, "gave up after the hard cap");
+  D.disarm();
+});

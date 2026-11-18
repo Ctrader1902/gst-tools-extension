@@ -83,5 +83,25 @@ test("a second start while the first is starting is refused", async () => {
   for (let i = 0; i < 100 && (running || starting); i++) await new Promise((r) => setTimeout(r, 50));
   chromeAnswers["chrome.tabs.query"] = () => [];
 });
+test("a run allows multiple downloads on GST sites, then puts the setting back", async () => {
+  const sets = chromeCalls.filter((c) => c.path === "chrome.contentSettings.automaticDownloads.set");
+  ok(sets.some((c) => c.args[0].primaryPattern === "https://*.gst.gov.in/*" && c.args[0].setting === "allow"),
+     "allowed for GST sites");
+  ok(chromeCalls.some((c) => c.path === "chrome.contentSettings.automaticDownloads.clear"), "cleared after the run");
+});
+test("the run finishes even if closing its tab never completes", async () => {
+  const authTab = { id: 5, windowId: 1, index: 0, url: "https://services.gst.gov.in/services/auth/dashboard" };
+  chromeAnswers["chrome.tabs.query"] = () => [authTab];
+  chromeAnswers["chrome.tabs.duplicate"] = () => ({ id: 11, windowId: 1, index: 1 });
+  chromeAnswers["chrome.tabs.get"] = (id) => ({ id, status: "complete" });
+  chromeAnswers["chrome.tabs.remove"] = () => new Promise(() => {});     // e.g. a "Leave site?" prompt
+  const r = await handle({ cmd: "start", taskKey: "gstr3b_ack", fy: "2025-26", months: ["May"], mode: "download" });
+  eq(r.ok, true);
+  stopReason = "Stopped by you.";
+  for (let i = 0; i < 60 && (running || starting); i++) await new Promise((r) => setTimeout(r, 50));
+  eq(!!running, false, "run marked finished");
+  delete chromeAnswers["chrome.tabs.remove"];
+  chromeAnswers["chrome.tabs.query"] = () => [];
+});
 </script>
 </body></html>

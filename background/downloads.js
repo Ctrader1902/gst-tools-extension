@@ -58,10 +58,12 @@
 
     /** Wait for downloads started at/after sinceMs to finish.  Returns the
      *  completed ones once nothing is in progress for stableMs; [] on timeout.
-     *  The deadline moves out while data is still flowing.  stopCheck() is
-     *  called every pass and may throw to abandon the wait. */
-    async waitNew(sinceMs, timeoutMs, stableMs = 1000, stopCheck = () => {}) {
+     *  The deadline moves out while data is still flowing, but never past
+     *  maxExtraMs (a download stuck "in progress" must not hold the run).
+     *  stopCheck() is called every pass and may throw to abandon the wait. */
+    async waitNew(sinceMs, timeoutMs, stableMs = 1000, stopCheck = () => {}, maxExtraMs = 300000) {
       let end = Date.now() + timeoutMs;
+      const hardEnd = end + maxExtraMs;
       let quietSince = null;
       while (Date.now() < end) {
         stopCheck();                 // throws when the run was stopped
@@ -69,7 +71,7 @@
         const done = recs.filter((r) => r.state === "complete");
         const busy = recs.filter((r) => r.state === "in_progress");
         if (busy.length) {
-          end = Math.max(end, Date.now() + 5000);
+          end = Math.min(Math.max(end, Date.now() + 5000), hardEnd);
           quietSince = null;
         } else if (done.length) {
           quietSince = quietSince || Date.now();
