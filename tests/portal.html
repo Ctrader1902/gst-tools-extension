@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>portal tests</title></head>
+<body>
+<div id="stage"></div>
+
+<!-- Returns Dashboard: search form + return tiles -->
+<template id="dashboard">
+  <nav><a href="#">Dashboard</a> <a href="#">Download</a></nav>
+  <div class="form">
+    <div><label for="fin">Financial Year</label>
+      <select id="fin" data-ng-model="finyr"><option>Select</option><option>2024-2025</option><option>2025-2026</option></select></div>
+    <div><label for="qtr">Quarter</label>
+      <select id="qtr"><option>Select</option><option>Quarter 1 (Apr - Jun)</option><option>Quarter 2 (Jul - Sep)</option></select></div>
+    <div><label for="mon">Period</label>
+      <select id="mon"><option>Select</option><option>April</option><option>May</option><option>June</option></select></div>
+    <button>SEARCH</button>
+  </div>
+  <div class="tiles">
+    <div class="tile"><p>Details of outward supplies of goods or services GSTR-1/IFF</p>
+      <button>VIEW</button> <button>DOWNLOAD</button></div>
+    <div class="tile"><p>Amendment of outward supplies GSTR-1A</p>
+      <button id="r1a-dl">DOWNLOAD</button></div>
+    <div class="tile"><p>Auto - drafted ITC Statement GSTR-2B</p>
+      <button>VIEW</button> <button id="b2-dl">DOWNLOAD</button></div>
+    <div class="tile"><p>Monthly Return GSTR-3B</p>
+      <button disabled>DOWNLOAD</button></div>
+  </div>
+</template>
+
+<!-- GSTR-2B download page after GENERATE JSON -->
+<template id="gstr2b">
+  <div class="help">Help ... It can be downloaded as either JSON file ...</div>
+  <h4>Download data for GSTR-2B</h4>
+  <button id="gen-json">GENERATE JSON FILE TO DOWNLOAD</button>
+  <table>
+    <tr><td>GSTR-2B Summary</td><td><a href="#" id="l1">Download here</a></td></tr>
+    <tr><td>GSTR-2B Details - Part 1</td><td><a href="#" id="l2">Download here</a></td></tr>
+  </table>
+  <button id="gen-xls">GENERATE EXCEL FILE TO DOWNLOAD</button>
+  <div class="alert" style="display:none">hidden message</div>
+</template>
+
+<!-- View e-Filed Returns: Monthly adds a month dropdown -->
+<template id="filed">
+  <div><label for="finYr">Financial Year</label>
+    <select id="finYr"><option>Select</option><option>2025-2026</option></select></div>
+  <div><label for="rp">Return Filing Period</label>
+    <select id="rp"><option>Select</option><option>Annual</option><option>Quarterly</option><option>Monthly</option></select></div>
+  <div id="month-slot"></div>
+  <div><label for="rt">Return Type</label>
+    <select id="rt"><option>Select</option><option>GSTR-1</option><option>GSTR-1A</option><option>GSTR-3B</option></select></div>
+  <button>SEARCH</button>
+</template>
+
+<template id="denied">
+  <div class="box"><h4>Access Denied!</h4><p>Your session is expired ...</p></div>
+</template>
+
+<template id="modal">
+  <div class="modal in" style="display:block">
+    <div class="modal-body">Are you sure you want to generate?</div>
+    <button class="btn">CANCEL</button> <button class="btn" id="proceed">PROCEED</button>
+  </div>
+</template>
+
+<script src="harness.js"></script>
+<script src="../lib/match.js"></script>
+<script src="../content/portal.js"></script>
+<script src="portal.test.js"></script>
+</body></html>
