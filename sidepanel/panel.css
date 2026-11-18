@@ -1,0 +1,53 @@
+:root {
+  --navy: #14213d; --navy-text: #aab6cc; --bg: #eef1f6; --card: #fff; --panel: #f7f9fc;
+  --border: #d8dee8; --text: #1f2937; --muted: #6b7280; --accent: #1d4ed8;
+  --accent-dark: #1e3a8a; --teal: #0f766e; --teal-dark: #115e59;
+  --ok: #15803d; --warn: #b45309; --err: #b91c1c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 13px "Segoe UI", system-ui, sans-serif; min-width: 300px; }
+header { background: var(--navy); color: #fff; padding: 12px 14px; }
+header .app { font-weight: 700; font-size: 15px; letter-spacing: .5px; }
+header .firm { color: var(--navy-text); font-size: 12px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+        margin: 10px; padding: 12px; }
+.status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.status.ok .dot { background: var(--ok); }
+.status.warn .dot { background: var(--warn); }
+.status.err .dot { background: var(--err); }
+.status.busy .dot { background: var(--accent); }
+.status .text { flex: 1; min-width: 150px; }
+label.field { display: block; font-weight: 600; margin: 0 0 4px; color: #374151; }
+select { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 6px;
+         font: inherit; background: #fff; }
+.section { margin-top: 12px; }
+.types label { display: block; padding: 5px 8px; border: 1px solid var(--border);
+               border-radius: 6px; margin-bottom: 4px; background: var(--panel); cursor: pointer; }
+.types label:has(input:checked) { border-color: var(--accent); background: #eef3ff; }
+.types .sub { color: var(--muted); font-size: 11px; margin-left: 22px; display: block; }
+.months-head { display: flex; justify-content: space-between; align-items: baseline; }
+.linkbtn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0 4px; font: inherit; }
+.months { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.months label { text-align: center; padding: 5px 0; border: 1px solid var(--border);
+                border-radius: 6px; background: var(--panel); cursor: pointer; user-select: none; }
+.months label:has(input:checked) { background: var(--accent); color: #fff; border-color: var(--accent); }
+.months input { display: none; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+button.btn { border: none; border-radius: 6px; padding: 8px 12px; font: 600 12px "Segoe UI", sans-serif;
+             cursor: pointer; color: #fff; }
+button.btn:disabled { opacity: .45; cursor: default; }
+.primary { background: var(--accent); } .primary:hover:not(:disabled) { background: var(--accent-dark); }
+.teal { background: var(--teal); } .teal:hover:not(:disabled) { background: var(--teal-dark); }
+.danger { background: var(--err); }
+.ghost { background: #eef2f7 !important; color: var(--text) !important; }
+.note { color: var(--muted); font-size: 11px; margin-top: 8px; }
+.hidden { display: none !important; }
+.log-head { display: flex; justify-content: space-between; align-items: center; }
+#log { margin-top: 6px; height: 260px; overflow-y: auto; background: #f8fafc;
+       border: 1px solid var(--border); border-radius: 6px; padding: 6px;
+       font: 11.5px Consolas, "Courier New", monospace; }
+#log .line { white-space: pre-wrap; word-break: break-word; }
+#log .t { color: #9ca3af; margin-right: 6px; }
+#log .ok { color: var(--ok); } #log .warn { color: var(--warn); } #log .err { color: var(--err); }
