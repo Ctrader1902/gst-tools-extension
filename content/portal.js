@@ -131,8 +131,9 @@
         options = optionTexts(hit.el);
         const match = M.bestMatch(options, value);
         if (match == null) continue;
-        if (current(hit.el) !== match) choose(hit.el, options.indexOf(match));
-        return { ok: true, match, found: true };
+        const changed = current(hit.el) !== match;
+        if (changed) choose(hit.el, options.indexOf(match));
+        return { ok: true, match, found: true, changed };
       }
       return { ok: false, found, options: options.filter(Boolean) };
     },

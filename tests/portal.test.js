@@ -158,3 +158,9 @@ test("click goes through the page's own helper when it is there (javascript: lin
   delete document.documentElement.dataset.gstMain;
   document.removeEventListener("gst-click", onGstClick);
 });
+
+test("selectLabelled says whether it changed the dropdown", () => {
+  stage("dashboard");
+  eq(P.selectLabelled(["financial year"], "2025-26").changed, true);
+  eq(P.selectLabelled(["financial year"], "2025-26").changed, false);
+});

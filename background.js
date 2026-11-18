@@ -71,7 +71,7 @@ function makeCtx() {
     gotoUrl: (url) => T.gotoUrl(url),
     waitNavigation: (doc, ms) => T.waitNavigation(doc, ms),
     waitIdle: (ms) => T.waitIdle(ms),
-    followNewTab: () => T.followNewTab(),
+    followNewTab: (ms) => T.followNewTab(ms),
     closeExtraTabs: () => T.closeExtraTabs(),
     takeAlerts: () => T.takeAlerts(),
     checkStop,

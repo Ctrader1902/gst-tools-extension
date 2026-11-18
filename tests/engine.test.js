@@ -225,3 +225,18 @@ test("VIEW row does not wait for a direct download", async () => {
   eq(r.state, "saved");
   eq(waits, [120000], "only the PDF wait");
 });
+
+test("GSTR-3B VIEW goes straight to the PDF button (no VIEW SUMMARY wait)", async () => {
+  const w = fakeWorld({
+    tile: () => ({ id: "tile", text: "View" }),
+    controls: { [MM.PDF_RX]: () => [{ id: "pdf", text: "DOWNLOAD FILED GSTR-3B" }] },
+    fileOn: ["pdf"],
+  });
+  w.page.selectLabelled = async (labels, value) => ({ ok: true, match: value, found: true, changed: false });
+  const waits = [];
+  w.ctx.followNewTab = async (ms) => { waits.push(ms); return false; };
+  const r = await E.runMonth(w.ctx, MM.TASKS.gstr3b_ack, "2025-26", "April", "download");
+  eq(r.state, "saved");
+  ok(w.t < 12000, `waited ${w.t} ms of portal time`);
+  ok(waits.every((ms) => ms <= 1000), `new-tab checks ${JSON.stringify(waits)}`);
+});

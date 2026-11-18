@@ -103,7 +103,7 @@
       return r.ok ? r : null;
     }, 500);
     if (hit) {
-      await ctx.sleep(1000);                 // dependent dropdowns refill
+      if (hit.changed !== false) await ctx.sleep(1000);   // dependent dropdowns refill
       ctx.log(`  ${labels[0]} = ${hit.match}`);
       return hit.match;
     }
@@ -148,8 +148,8 @@
     }
     ctx.log(`${task.ret} tile: ${btn.text || "button"}`);
     await ctx.page.click(btn.id);
-    await ctx.followNewTab();
     await ctx.sleep(2000);
+    await ctx.followNewTab(800);          // a new tab, if any, exists by now
     await openOfflineDownloadTab(ctx);
     if (task.fmt === "excel") return { state: "saved", files: await grabExcel(ctx), note: "" };
     if (mode === "generate") return requestJson(ctx);
@@ -325,10 +325,11 @@
     let files = /^view$/i.test(btn.text || "") ? [] : await waitFiles(ctx, since, 12000);
     if (files.length) return files;
     ctx.downloads.settle();
-    await ctx.followNewTab();
+    await ctx.followNewTab(800);
 
-    // GSTR-1: VIEW opens the return; the PDF is on its summary page
-    const summary = await waitControl(ctx, "view summary", 20000);
+    // GSTR-1: VIEW opens the return; the PDF is on its summary page.
+    // Other returns show the PDF button straight away.
+    const summary = task.ret === "GSTR-1" ? await waitControl(ctx, "view summary", 20000) : null;
     if (summary) {
       ctx.log("Opening VIEW SUMMARY ...");
       await ctx.page.click(summary.id);
